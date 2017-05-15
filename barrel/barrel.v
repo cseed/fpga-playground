@@ -1,18 +1,21 @@
 
 // FIXME todo shifts, load, store
-// FIXME display register instruction (custom)
+// FIXME tests
+// FIXME load/store
+// FIXME shifts
+// FIXME EBREAK, SYSTEM
 module barrel(
               input clk,
               input resetn,
               output reg halt);
    
    reg [31:0]       regs [0:31];
-   reg              pc;
+   reg [31:0] 	    pc;
    
    reg [31:0]       rom [0:1023];
    
    initial
-     $readmemh("image.hex", rom);
+     $readmemh("example.hex", rom);
    
    reg [31:0]       instr;
    reg [31:0]       result;
@@ -25,7 +28,10 @@ module barrel(
    localparam writeback = 8'b00010000;
    
    reg [7:0]        state;
-
+   
+   initial
+     $monitor("state %08b", state);
+   
    // opcodes
    localparam LUI = 7'b0110111;
    localparam AUIPC = 7'b0110111;
@@ -42,7 +48,7 @@ module barrel(
    localparam CUSTOM0 = 7'b0001011;
    localparam CUSTOM1 = 7'b0101011;
    
-   wire [7:0]       opcode;
+   wire [6:0]       opcode;
    wire [4:0]       rs1, rs2, rd;
    wire [2:0]       funct3;
    wire [6:0]       funct7;
@@ -144,16 +150,19 @@ module barrel(
       end else begin
          case (state)
            fetch: begin
-              instr <= rom[pc];
+	      // $display("fetch pc: %08x", pc);
+	      // FIXME unaligned address exception
+              instr <= rom[pc[31:2]];
               state <= decode;
            end
            
            decode: begin
+	      // $display("decode: %08x", instr);
+	      // $display("opcode %07b funct3 %03b", opcode, funct3);
               if (opcode == CUSTOM0 && funct3 == FUNCT3_HALT)
                 halt <= 1;
               
               case (opcode)
-                LUI: op <= OP_ADD;
                 AUIPC: op <= OP_ADD;
                 OP:
                   case (funct)
@@ -191,7 +200,7 @@ module barrel(
            
            read: begin
               if (opcode == CUSTOM0 && funct3 == FUNCT3_DISPLAY)
-                $display("x%d: %x", rs1, regs[rs1]);
+                $display("x%0d: %x", rs1, regs[rs1]);
               
               if (opcode == AUIPC || opcode == JALR)
                 op1 <= pc;
@@ -202,7 +211,7 @@ module barrel(
               
               if (opcode == OP_IMM || opcode == JALR)
                 op2 <= {{20{i_type_imm[11]}}, i_type_imm};
-              else if (opcode == AUIPC || opcode == LUI)
+              else if (opcode == AUIPC)
                 op2 <= {u_type_imm, 12'b0};
               else if (rs2 == 0)
                 op2 <= 0;
@@ -236,11 +245,17 @@ module barrel(
            end
            
            writeback: begin
-              if (opcode == LUI || opcode == AUIPC || opcode == OP || opcode == OP_IMM || opcode == STORE)
-                regs[rd] <= result;
-              else if (opcode == JAL || opcode == JALR)
-                regs[rd] <= pc + 4;
-              
+              if (opcode == LUI) begin
+		 // $display("regs[%d] <= %08x", rd, {u_type_imm, 12'b0});
+		 regs[rd] <= {u_type_imm, 12'b0};
+	      end else if (opcode == AUIPC || opcode == OP || opcode == OP_IMM || opcode == STORE) begin
+		 // $display("regs[%d] <= %08x", rd, result);
+                 regs[rd] <= result;
+              end else if (opcode == JAL || opcode == JALR) begin
+		 // $display("regs[%d] <= %08x", rd, pc + 4);
+                 regs[rd] <= pc + 4;
+	      end
+	      
               if (opcode == JAL || opcode == BRANCH)
                 pc <= pc + pc_op2;
               else if (opcode == JALR)

@@ -2,6 +2,10 @@ module tb;
    
    reg clk;
    reg resetn;
+   wire halt;
+   
+   initial
+     $monitor("clk %b resetn %b halt %b", clk, resetn, halt);
    
    initial begin
       clk = 0;
@@ -14,12 +18,10 @@ module tb;
    always
      #5 clk = !clk;
    
-   wire halt;
-   
    barrel inst(.clk(clk), .resetn(resetn), .halt(halt));
 
    always @(posedge clk) begin
-      if (halt && !resetn)
+      if (resetn && halt)
         $finish_and_return(0);
    end
 
