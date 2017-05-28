@@ -4,8 +4,7 @@ module tb;
    reg resetn;
    wire halt;
    
-   initial
-     $monitor("clk %b resetn %b halt %b", clk, resetn, halt);
+   // initial $monitor("clk %b resetn %b halt %b", clk, resetn, halt);
    
    initial begin
       clk = 0;

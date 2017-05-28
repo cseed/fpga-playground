@@ -1,6 +1,9 @@
 
-example: _start.S
-	riscv32-unknown-elf-gcc -ffreestanding -nostdlib _start.S -o example
+main.s: main.c
+	riscv32-unknown-elf-gcc -ffreestanding -nostdlib -O -S main.c
+
+example: _start.S main.s
+	riscv32-unknown-elf-gcc -ffreestanding -nostdlib _start.S main.s -O -o example
 
 example.bin: example
 	riscv32-unknown-elf-objcopy --only-section '.text' -O binary example example.bin
