@@ -179,6 +179,9 @@ module barrel(
    localparam OP_AND = 7;
    localparam OP_OR = 8;
    localparam OP_XOR = 9;
+   localparam OP_SLL = 10;
+   localparam OP_SRL = 11;
+   localparam OP_SRA = 12;
    
    localparam [2:0] FUNCT3_ADDI = 3'b000;
    localparam [2:0] FUNCT3_SLTI = 3'b010;
@@ -368,6 +371,9 @@ module barrel(
                     FUNCT_AND: op <= OP_AND;
                     FUNCT_OR: op <= OP_OR;
                     FUNCT_XOR: op <= OP_XOR;
+		    FUNCT_SLL: op <= OP_SLL;
+		    FUNCT_SRL: op <= OP_SRL;
+		    FUNCT_SRA: op <= OP_SRA;
                   endcase
                 OP_IMM:
                   case (funct3)
@@ -377,6 +383,9 @@ module barrel(
                     FUNCT3_ANDI: op <= OP_AND;
                     FUNCT3_ORI: op <= OP_OR;
                     FUNCT3_XORI: op <= OP_XOR;
+		    FUNCT3_SLLI: op <= OP_SLL;
+		    FUNCT3_SRLI: op <= OP_SRL;
+		    FUNCT3_SRAI: op <= OP_SRA;
                   endcase
                 BRANCH:
                   case (funct3)
@@ -427,9 +436,40 @@ module barrel(
                 OP_AND: result <= op1 & op2;
                 OP_OR: result <= op1 | op2;
                 OP_XOR: result <= op1 ^ op2;
+		OP_SLL:
+		  if (op2[4:0] == 0)
+		    result <= op1;
+		  else if (op2[4:0] == 1)
+		    result <= {op1[30:0], 1'b0};
+		  else begin
+		     op1 <= {op1[30:0], 1'b0};
+		     op2[4:0] <= op2[4:0] - 1;
+		  end
+		
+		OP_SRL:
+		  if (op2[4:0] == 0)
+		    result <= op1;
+		  else if (op2[4:0] == 1)
+		    result <= {1'b0, op1[31:1]};
+		  else begin
+		     op1 <= {1'b0, op1[31:1]};
+		     op2[4:0] <= op2[4:0] - 1;
+		  end
+		
+		OP_SRA:
+		  if (op2[4:0] == 0)
+		    result <= op1;
+		  else if (op2[4:0] == 1)
+		    result <= {op1[31], op1[31:1]};
+		  else begin
+		     op1 <= {op1[31], op1[31:1]};
+		     op2[4:0] <= op2[4:0] - 1;
+		  end
               endcase
-              
-              state <= WRITEBACK;
+	      
+	      if ((op != OP_SLL && op != OP_SRL && op != OP_SRA)
+		  || op2[4:0] == 0 || op2[4:0] == 1)
+		state <= WRITEBACK;
            end
            
            WRITEBACK: begin
