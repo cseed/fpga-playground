@@ -1,4 +1,7 @@
 
+// TODO
+// unify memory
+
 module ram32(
              input                  clk,
              input                  resetn,
@@ -15,6 +18,18 @@ module ram32(
    reg [7:0]                        mem1[0:(1 << ADDR_WIDTH) - 1];
    reg [7:0]                        mem2[0:(1 << ADDR_WIDTH) - 1];
    reg [7:0]                        mem3[0:(1 << ADDR_WIDTH) - 1];
+   
+   integer 			    i;
+   initial begin
+      for (i = 0; i < (1 << ADDR_WIDTH); i = i + 1)
+	mem0[i] = 0;
+      for (i = 0; i < (1 << ADDR_WIDTH); i = i + 1)
+	mem1[i] = 0;
+      for (i = 0; i < (1 << ADDR_WIDTH); i = i + 1)
+	mem2[i] = 0;
+      for (i = 0; i < (1 << ADDR_WIDTH); i = i + 1)
+	mem3[i] = 0;
+   end
    
    always @(posedge clk) begin
       if (bwe[0])
@@ -49,7 +64,11 @@ module rom32(
    reg [31:0]                         data [0:(1 << (ADDR_WIDTH - 2)) - 1];
    
    parameter ADDR_WIDTH = 12;
+`ifdef IMAGE
+   parameter PATH = `IMAGE;
+`else
    parameter PATH = "example.hex";
+`endif
    
    initial
      $readmemh(PATH, data);
@@ -63,13 +82,11 @@ module rom32(
    
 endmodule
 
-// FIXME shifts
-// FIXME tests
-// FIXME EBREAK, SYSTEM
 module barrel(
-              input clk,
-              input resetn,
-              output reg halt);
+              input 		clk,
+              input 		resetn,
+              output reg 	exit,
+	      output reg [31:0] exitcode);
    
    reg [31:0]       regs [0:31];
    reg [31:0] 	    pc;
@@ -91,14 +108,12 @@ module barrel(
    reg [31:2]       rom_addr; // word address
    reg              rom_ren;
    wire [31:0]      rom_dout;
-   rom32 #(
-           .PATH("example.hex")
-           ) rom32 (
-                    .clk(clk),
-                    .resetn(resetn),
-                    .addr(rom_addr),
-                    .ren(rom_ren),
-                    .dout(rom_dout));
+   rom32 rom32 (
+                .clk(clk),
+                .resetn(resetn),
+                .addr(rom_addr),
+                .ren(rom_ren),
+                .dout(rom_dout));
    
    // states
    localparam FETCH = 8'b00000001;
@@ -110,7 +125,7 @@ module barrel(
    reg [7:0]        state;
    
    initial
-     $monitor("clk %b resetn %b state %08b instr %08x ram_bwe %04b ram_din %08x ram_ren %b ram_dout %08x", clk, resetn, state, instr, ram_bwe, ram_din, ram_ren, ram_dout);
+     $monitor("%08t: clk %b resetn %b state %08b instr %08x ram_bwe %04b ram_din %08x ram_ren %b ram_dout %08x", $time, clk, resetn, state, instr, ram_bwe, ram_din, ram_ren, ram_dout);
    
    always @* begin
       case (state)
@@ -130,7 +145,7 @@ module barrel(
    
    // opcodes
    localparam LUI = 7'b0110111;
-   localparam AUIPC = 7'b0110111;
+   localparam AUIPC = 7'b0010111;
    localparam OP = 7'b0110011;
    localparam OP_IMM = 7'b0010011;
    localparam JAL = 7'b1101111;
@@ -172,6 +187,7 @@ module barrel(
    localparam OP_ADD = 0;
    localparam OP_SUB = 1;
    localparam OP_EQ = 2;
+   localparam OP_NE = 13; // FIXME
    localparam OP_LT = 3;
    localparam OP_LTU = 4;
    localparam OP_GE = 5;
@@ -190,8 +206,7 @@ module barrel(
    localparam [2:0] FUNCT3_ORI = 3'b110;
    localparam [2:0] FUNCT3_ANDI = 3'b111;
    localparam [2:0] FUNCT3_SLLI = 3'b001;
-   localparam [2:0] FUNCT3_SRLI = 3'b101;
-   localparam [2:0] FUNCT3_SRAI = 3'b101;
+   localparam [2:0] FUNCT3_SRxI = 3'b101;
 
    localparam [2:0] FUNCT3_BEQ = 3'b000;
    localparam [2:0] FUNCT3_BNE = 3'b001;
@@ -227,7 +242,7 @@ module barrel(
    
    // custom
    localparam [2:0] FUNCT3_DISPLAY = 3'b000;
-   localparam [2:0] FUNCT3_HALT = 3'b001;
+   localparam [2:0] FUNCT3_EXIT = 3'b001;
    
    localparam [6:0] FUNCT7_ADD = 7'b0000000;
    localparam [6:0] FUNCT7_SUB = 7'b0100000;
@@ -348,7 +363,7 @@ module barrel(
       if (!resetn) begin
          pc <= 0;
          state <= FETCH;
-         halt <= 0;
+         exit <= 0;
       end else begin
          case (state)
            FETCH:
@@ -357,8 +372,12 @@ module barrel(
            DECODE: begin
 	      // $display("DECODE: %08x", instr);
 	      // $display("opcode %07b funct3 %03b", opcode, funct3);
-              if (opcode == CUSTOM0 && funct3 == FUNCT3_HALT)
-                halt <= 1;
+              if (opcode == CUSTOM0 && funct3 == FUNCT3_EXIT) begin
+		 $display("exit x10 %08x x11 %08x", regs[10], regs[11]);
+		 
+                 exit <= 1;
+		 exitcode <= regs[10];
+	      end
               
               case (opcode)
                 AUIPC: op <= OP_ADD;
@@ -374,6 +393,7 @@ module barrel(
 		    FUNCT_SLL: op <= OP_SLL;
 		    FUNCT_SRL: op <= OP_SRL;
 		    FUNCT_SRA: op <= OP_SRA;
+		    default: op <= 0;
                   endcase
                 OP_IMM:
                   case (funct3)
@@ -384,18 +404,24 @@ module barrel(
                     FUNCT3_ORI: op <= OP_OR;
                     FUNCT3_XORI: op <= OP_XOR;
 		    FUNCT3_SLLI: op <= OP_SLL;
-		    FUNCT3_SRLI: op <= OP_SRL;
-		    FUNCT3_SRAI: op <= OP_SRA;
+		    FUNCT3_SRxI:
+		      case (funct7)
+			FUNCT7_SRL: op <= OP_SRL;
+			FUNCT7_SRA: op <= OP_SRA;
+			default: op <= 0;
+		      endcase
+		    default: op <= 0;
                   endcase
                 BRANCH:
                   case (funct3)
                     FUNCT3_BEQ: op <= OP_EQ;
-                    FUNCT3_BNE: op <= OP_EQ;
+                    FUNCT3_BNE: op <= OP_NE;
                     FUNCT3_BLT: op <= OP_LT;
                     FUNCT3_BLTU: op <= OP_LTU;
                     FUNCT3_BGE: op <= OP_GE;
                     FUNCT3_BGEU: op <= OP_GEU;
                   endcase
+		default: op <= 0;
               endcase
               
               state <= READ;
@@ -422,6 +448,8 @@ module barrel(
            end
            
            EXECUTE: begin
+	      $display("op1 %08x op2 %08x", op1, op2);
+	      
               if (opcode == CUSTOM0 && funct3 == FUNCT3_DISPLAY)
                 $display("x%0d: %x", rs1, op1);
               
@@ -429,6 +457,7 @@ module barrel(
                 OP_ADD: result <= op1 + op2;
                 OP_SUB: result <= op1 - op2;
                 OP_EQ: result <= op1 == op2;
+                OP_NE: result <= op1 != op2;
                 OP_LT: result <= $signed(op1) < $signed(op2);
                 OP_LTU: result <= op1 < op2;
                 OP_GE: result <= $signed(op1) >= $signed(op2);
@@ -467,20 +496,22 @@ module barrel(
 		  end
               endcase
 	      
-	      if ((op != OP_SLL && op != OP_SRL && op != OP_SRA)
-		  || op2[4:0] == 0 || op2[4:0] == 1)
+	      if ((op == OP_SLL || op == OP_SRL || op == OP_SRA)
+		  && op2[4:0] > 1)
+		state <= EXECUTE;
+	      else
 		state <= WRITEBACK;
            end
            
            WRITEBACK: begin
               if (opcode == LUI) begin
-		 // $display("regs[%d] <= %08x", rd, {u_type_imm, 12'b0});
+		 $display("regs[%d] <= %08x", rd, {u_type_imm, 12'b0});
 		 regs[rd] <= {u_type_imm, 12'b0};
 	      end else if (opcode == AUIPC || opcode == OP || opcode == OP_IMM) begin
-		 // $display("regs[%d] <= %08x", rd, result);
+		 $display("regs[%d] <= %08x", rd, result);
                  regs[rd] <= result;
               end else if (opcode == JAL || opcode == JALR) begin
-		 // $display("regs[%d] <= %08x", rd, pc + 4);
+		 $display("regs[%d] <= %08x", rd, pc + 4);
                  regs[rd] <= pc4;
 	      end else if (opcode == LOAD) begin : writeback_load
                  reg [31:0] v;
@@ -521,6 +552,7 @@ module barrel(
                    end
                  endcase
                  
+		 $display("regs[%d] <= %08x", rd, v);
                  regs[rd] <= v;
               end
 	      

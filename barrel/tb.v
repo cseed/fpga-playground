@@ -2,7 +2,8 @@ module tb;
    
    reg clk;
    reg resetn;
-   wire halt;
+   wire exit;
+   wire [31:0] exitcode;
    
    // initial $monitor("clk %b resetn %b halt %b", clk, resetn, halt);
    
@@ -17,14 +18,14 @@ module tb;
    always
      #5 clk = !clk;
    
-   barrel inst(.clk(clk), .resetn(resetn), .halt(halt));
-
+   barrel inst (.clk(clk), .resetn(resetn), .exit(exit), .exitcode(exitcode));
+   
    always @(posedge clk) begin
-      if (resetn && halt)
-        $finish_and_return(0);
+      if (resetn && exit)
+        $finish_and_return(exitcode);
    end
 
    initial
-     #10000 $finish_and_return(0);
+     #100000 $finish_and_return(255);
    
 endmodule

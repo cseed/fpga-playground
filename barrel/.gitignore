@@ -3,3 +3,4 @@
 /example.bin
 /example.hex
 /main.s
+/tests/isa/rv32ui/p-*
