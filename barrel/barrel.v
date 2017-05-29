@@ -36,10 +36,10 @@ module ram32(
       
       if (bwe[1])
         mem[addr][15:8] <= din[15:8];
-
+      
       if (bwe[2])
         mem[addr][23:16] <= din[23:16];
-
+      
       if (bwe[3])
         mem[addr][31:24] <= din[31:24];
    end
@@ -228,63 +228,67 @@ module barrel(
    end
    
    always @* begin : load_store
-      case (state)
-	FETCH: begin
+      if (opcode == LOAD)
+	eaddr = op1 + {{20{i_type_imm[11]}}, i_type_imm};
+      else
+	eaddr = op1 + {{20{s_type_imm[11]}}, s_type_imm}; // store
+      
+      (* parallel_case *)
+      case (1'b1)
+	state == FETCH: begin
 	   ram_addr = pc[31:2];
 	   ram_ren = 1;
 	   ram_bwe = 0;
+	   ram_din = 32'bx;
 	end
 	
-	EXECUTE: begin
-	   case (opcode)
-	     LOAD: begin
-		eaddr = op1 + {{20{i_type_imm[11]}}, i_type_imm};
-		ram_addr = eaddr[31:2];
-		ram_ren = 1;
-		ram_bwe = 0;
+	state == EXECUTE && opcode == LOAD: begin
+	   ram_addr = eaddr[31:2];
+	   ram_ren = 1;
+	   ram_bwe = 0;
+	   ram_din = 32'bx;
+	end
+	
+	state == EXECUTE && opcode == STORE: begin
+	   ram_addr = eaddr[31:2];
+	   ram_ren = 0;
+	   
+	   case (funct3)
+	     FUNCT3_SW: begin
+		ram_bwe = 4'b1111;
+		ram_din = op2;
 	     end
 	     
-	     STORE: begin
-		eaddr = op1 + {{20{s_type_imm[11]}}, s_type_imm};
-		ram_addr = eaddr[31:2];
-		ram_ren = 0;
-		
-		case (funct3)
-		  FUNCT3_SW: begin
-		     ram_bwe = 4'b1111;
-		     ram_din = op2;
-		  end
-		  
-		  FUNCT3_SH: begin
-		     case (eaddr[1])
-                       1'b0: ram_bwe = 4'b0011;
-                       1'b1: ram_bwe = 4'b1100;
-		     endcase
-		     ram_din = {2{op2[15:0]}};
-		  end
-		  
-		  FUNCT3_SB: begin
-		     case (eaddr[1:0])
-                       2'b00: ram_bwe = 4'b0001;
-                       2'b01: ram_bwe = 4'b0010;
-                       2'b10: ram_bwe = 4'b0100;
-                       2'b11: ram_bwe = 4'b1000;
-		     endcase
-		     ram_din = {4{op2[7:0]}};
-		  end
-		  
-		  default: begin
-		     ram_bwe = 0;
-		     ram_din = op2;
-		  end
+	     FUNCT3_SH: begin
+		case (eaddr[1])
+                  1'b0: ram_bwe = 4'b0011;
+                  1'b1: ram_bwe = 4'b1100;
 		endcase
+		ram_din = {2{op2[15:0]}};
+	     end
+	     
+	     FUNCT3_SB: begin
+		case (eaddr[1:0])
+                  2'b00: ram_bwe = 4'b0001;
+                  2'b01: ram_bwe = 4'b0010;
+                  2'b10: ram_bwe = 4'b0100;
+                  2'b11: ram_bwe = 4'b1000;
+		endcase
+		ram_din = {4{op2[7:0]}};
 	     end
 	     
 	     default: begin
-		ram_ren = 0;
 		ram_bwe = 0;
+		ram_din = 32'bx;
 	     end
 	   endcase
+	end
+	
+	default: begin
+	   ram_addr = 32'bx;
+	   ram_ren = 0;
+	   ram_bwe = 0;
+	   ram_din = 32'bx;
 	end
       endcase
    end
