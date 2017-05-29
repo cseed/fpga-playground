@@ -23,20 +23,18 @@ rv32ui_tests = \
 	and andi \
 	auipc \
 	beq bge bgeu blt bltu bne \
+	fence_i \
+	jal jalr \
 	lb lbu lh lhu lw \
+	lui \
 	or ori \
 	sb sh sw \
 	sll slli \
 	slt slti sltiu sltu \
-	sra \
+	sra srai \
 	srl srli \
 	sub \
 	xor xori \
-	srai \
-	lui \
-	jal jalr
-
-# FIXME fence_i
 
 TESTS = $(addprefix tests/isa/rv32ui/p-,$(rv32ui_tests))
 
@@ -72,7 +70,6 @@ $(TESTS_STAMP): %-stamp: %.barrel
 
 .PHONY:
 test: $(TESTS_DUMP) $(TESTS_STAMP)
-	echo TODO
 
 .PHONY: clean
 clean:

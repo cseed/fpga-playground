@@ -14,73 +14,44 @@ module ram32(
    // 12 = 4K words
    parameter ADDR_WIDTH = 12;
    
-   reg [7:0]                        mem0[0:(1 << ADDR_WIDTH) - 1];
-   reg [7:0]                        mem1[0:(1 << ADDR_WIDTH) - 1];
-   reg [7:0]                        mem2[0:(1 << ADDR_WIDTH) - 1];
-   reg [7:0]                        mem3[0:(1 << ADDR_WIDTH) - 1];
-   
-   integer 			    i;
-   initial begin
-      for (i = 0; i < (1 << ADDR_WIDTH); i = i + 1)
-	mem0[i] = 0;
-      for (i = 0; i < (1 << ADDR_WIDTH); i = i + 1)
-	mem1[i] = 0;
-      for (i = 0; i < (1 << ADDR_WIDTH); i = i + 1)
-	mem2[i] = 0;
-      for (i = 0; i < (1 << ADDR_WIDTH); i = i + 1)
-	mem3[i] = 0;
-   end
-   
-   always @(posedge clk) begin
-      if (bwe[0])
-        mem0[addr] <= din[7:0];
-
-      if (bwe[1])
-        mem1[addr] <= din[15:8];
-
-      if (bwe[2])
-        mem2[addr] <= din[23:16];
-
-      if (bwe[3])
-        mem3[addr] <= din[31:24];
-   end
-   
-   always @(posedge clk) begin
-      if (!resetn)
-        dout <= 0;
-      else if (ren)
-        dout <= {mem3[addr], mem2[addr], mem1[addr], mem0[addr]};
-   end
-   
-endmodule             
-
-module rom32(
-             input                    clk,
-             input                    resetn,
-             input [ADDR_WIDTH - 1:2] addr,
-             input                    ren,
-             output reg [31:0]        dout);
-   
-   reg [31:0]                         data [0:(1 << (ADDR_WIDTH - 2)) - 1];
-   
-   parameter ADDR_WIDTH = 12;
 `ifdef IMAGE
    parameter PATH = `IMAGE;
 `else
    parameter PATH = "example.hex";
 `endif
    
-   initial
-     $readmemh(PATH, data);
+   reg [31:0] 			    mem [0:(1 << (ADDR_WIDTH - 2)) - 1];
+   
+   integer 			    i;
+   initial begin
+      for (i = 0; i < (1 << (ADDR_WIDTH - 2)); i = i + 1)
+	mem[i] = 0;
+      $readmemh(PATH, mem);
+      $display("mem[0] %08x", mem[0]);
+   end
+   
+   always @(posedge clk) begin
+      if (bwe[0])
+        mem[addr][7:0] <= din[7:0];
+      
+      if (bwe[1])
+        mem[addr][15:8] <= din[15:8];
+
+      if (bwe[2])
+        mem[addr][23:16] <= din[23:16];
+
+      if (bwe[3])
+        mem[addr][31:24] <= din[31:24];
+   end
    
    always @(posedge clk) begin
       if (!resetn)
         dout <= 0;
       else if (ren)
-        dout <= data[addr];
+        dout <= mem[addr];
    end
    
-endmodule
+endmodule             
 
 module barrel(
               input 		clk,
@@ -90,7 +61,7 @@ module barrel(
    
    reg [31:0]       regs [0:31];
    reg [31:0] 	    pc;
-
+   
    reg [31:2]       ram_addr;
    reg [31:0]       ram_din;
    reg [3:0]        ram_bwe;
@@ -105,16 +76,6 @@ module barrel(
              .dout(ram_dout),
              .ren(ram_ren));
    
-   reg [31:2]       rom_addr; // word address
-   reg              rom_ren;
-   wire [31:0]      rom_dout;
-   rom32 rom32 (
-                .clk(clk),
-                .resetn(resetn),
-                .addr(rom_addr),
-                .ren(rom_ren),
-                .dout(rom_dout));
-   
    // states
    localparam FETCH = 8'b00000001;
    localparam DECODE = 8'b00000010;
@@ -127,21 +88,10 @@ module barrel(
    initial
      $monitor("%08t: clk %b resetn %b state %08b instr %08x ram_bwe %04b ram_din %08x ram_ren %b ram_dout %08x", $time, clk, resetn, state, instr, ram_bwe, ram_din, ram_ren, ram_dout);
    
-   always @* begin
-      case (state)
-        FETCH: begin
-           rom_ren = 1;
-           rom_addr = pc[31:2];
-        end
-        
-        default: begin
-           rom_ren = 0;
-           rom_addr = pc[31:2];
-        end
-      endcase
-   end
-   
-   wire [31:0] instr = rom_dout;
+   reg [31:0] 	    instr_reg;
+
+   // FIXME
+   wire [31:0] 	    instr = (state == DECODE ? ram_dout : instr_reg);
    
    // opcodes
    localparam LUI = 7'b0110111;
@@ -271,54 +221,72 @@ module barrel(
    reg [31:0]       result;
 
    reg [31:0]       eaddr;
+
+   always @(posedge clk) begin
+      if (state == DECODE)
+	instr_reg <= ram_dout;
+   end
    
    always @* begin : load_store
-      if (opcode == LOAD)
-        eaddr = op1 + {{20{i_type_imm[11]}}, i_type_imm};
-      else
-        eaddr = op1 + {{20{s_type_imm[11]}}, s_type_imm}; // store
-      
-      ram_addr = eaddr[31:2];
-      
-      if (state == EXECUTE && opcode == LOAD)
-        ram_ren = 1;
-      else
-        ram_ren = 0;
-      
-      if (state == EXECUTE && opcode == STORE) begin
-         case (funct3)
-           FUNCT3_SW: begin
-              ram_bwe = 4'b1111;
-              ram_din = op2;
-           end
-           
-           FUNCT3_SH: begin
-              case (eaddr[1])
-                1'b0: ram_bwe = 4'b0011;
-                1'b1: ram_bwe = 4'b1100;
-              endcase
-              ram_din = {2{op2[15:0]}};
-           end
-           
-           FUNCT3_SB: begin
-              case (eaddr[1:0])
-                2'b00: ram_bwe = 4'b0001;
-                2'b01: ram_bwe = 4'b0010;
-                2'b10: ram_bwe = 4'b0100;
-                2'b11: ram_bwe = 4'b1000;
-              endcase
-              ram_din = {4{op2[7:0]}};
-           end
-           
-           default: begin
-              ram_bwe = 0;
-              ram_din = op2;
-           end
-         endcase
-      end else begin
-         ram_bwe = 0;
-         ram_din = op2;
-      end
+      case (state)
+	FETCH: begin
+	   ram_addr = pc[31:2];
+	   ram_ren = 1;
+	   ram_bwe = 0;
+	end
+	
+	EXECUTE: begin
+	   case (opcode)
+	     LOAD: begin
+		eaddr = op1 + {{20{i_type_imm[11]}}, i_type_imm};
+		ram_addr = eaddr[31:2];
+		ram_ren = 1;
+		ram_bwe = 0;
+	     end
+	     
+	     STORE: begin
+		eaddr = op1 + {{20{s_type_imm[11]}}, s_type_imm};
+		ram_addr = eaddr[31:2];
+		ram_ren = 0;
+		
+		case (funct3)
+		  FUNCT3_SW: begin
+		     ram_bwe = 4'b1111;
+		     ram_din = op2;
+		  end
+		  
+		  FUNCT3_SH: begin
+		     case (eaddr[1])
+                       1'b0: ram_bwe = 4'b0011;
+                       1'b1: ram_bwe = 4'b1100;
+		     endcase
+		     ram_din = {2{op2[15:0]}};
+		  end
+		  
+		  FUNCT3_SB: begin
+		     case (eaddr[1:0])
+                       2'b00: ram_bwe = 4'b0001;
+                       2'b01: ram_bwe = 4'b0010;
+                       2'b10: ram_bwe = 4'b0100;
+                       2'b11: ram_bwe = 4'b1000;
+		     endcase
+		     ram_din = {4{op2[7:0]}};
+		  end
+		  
+		  default: begin
+		     ram_bwe = 0;
+		     ram_din = op2;
+		  end
+		endcase
+	     end
+	     
+	     default: begin
+		ram_ren = 0;
+		ram_bwe = 0;
+	     end
+	   endcase
+	end
+      endcase
    end
    
    reg [31:0]       pc4;
@@ -561,8 +529,5 @@ module barrel(
            
          endcase
       end
-        
-        
    end
-   
 endmodule
