@@ -4,3 +4,9 @@
 /example.hex
 /main.s
 /tests/isa/rv32ui/p-*
+/save
+/.Xil
+/main.bit
+*~
+/*_webtalk.*
+/logs/*.log

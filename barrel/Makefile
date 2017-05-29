@@ -1,4 +1,6 @@
 
+VIVADO = vivado
+
 main.s: main.c
 	riscv32-unknown-elf-gcc -ffreestanding -nostdlib -O -S main.c
 
@@ -71,7 +73,17 @@ $(TESTS_STAMP): %-stamp: %.barrel
 .PHONY:
 test: $(TESTS_DUMP) $(TESTS_STAMP)
 
+main.bit: main.v main.xdc barrel.v example.hex
+	$(VIVADO) -nojournal -mode batch -source synth.tcl -log logs/synth.log
+
 .PHONY: clean
 clean:
 	rm -f example example.bin example.hex barrel
 	rm -f tests/isa/rv32ui/p-*
+	rm -f main.bit
+	rm -rf .Xil
+	rm -f *_webtalk.*
+	rm -f logs/*.log
+	rm -f vivado*.jou vivado*.log
+	rm -f vivado_*.str
+	rm -f fsm_encoding.os

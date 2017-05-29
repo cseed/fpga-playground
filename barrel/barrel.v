@@ -294,7 +294,6 @@ module barrel(
    end
    
    reg [31:0]       pc4;
-   reg [31:0]       pc_result;
    
    // jal: pc <= pc + $signed(uj_imm << 1), rd <= pc + 4
    // jalr: pc <= (rs1 + $signed(i_imm)) & ~1, rd <= pc + 4
@@ -382,7 +381,6 @@ module barrel(
 			FUNCT7_SRA: op <= OP_SRA;
 			default: op <= 0;
 		      endcase
-		    default: op <= 0;
                   endcase
                 BRANCH:
                   case (funct3)
