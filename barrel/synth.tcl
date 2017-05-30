@@ -1,4 +1,3 @@
-# read_verilog clock.v
 read_verilog main.v
 read_verilog barrel.v
 read_xdc main.xdc
@@ -11,4 +10,5 @@ route_design
 report_utilization
 report_timing
 
+write_verilog -force synth_main.v
 write_bitstream -force main.bit

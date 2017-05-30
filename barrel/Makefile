@@ -73,7 +73,7 @@ $(TESTS_STAMP): %-stamp: %.barrel
 .PHONY:
 test: $(TESTS_DUMP) $(TESTS_STAMP)
 
-main.bit: main.v main.xdc barrel.v example.hex
+main.bit: main.v main.xdc barrel.v example.hex synth.tcl
 	$(VIVADO) -nojournal -mode batch -source synth.tcl -log logs/synth.log
 
 .PHONY: clean

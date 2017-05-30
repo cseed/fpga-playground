@@ -1,6 +1,7 @@
 
 // TODO
-// unify memory
+// trap unknown instructions
+// test on hardware
 
 module ram32(
              input                  clk,
@@ -25,9 +26,8 @@ module ram32(
    integer 			    i;
    initial begin
       for (i = 0; i < (1 << (ADDR_WIDTH - 2)); i = i + 1)
-	mem[i] = 0;
+        mem[i] = 0;
       $readmemh(PATH, mem);
-      $display("mem[0] %08x", mem[0]);
    end
    
    always @(posedge clk) begin
@@ -90,7 +90,6 @@ module barrel(
    
    reg [31:0] 	    instr_reg;
 
-   // FIXME
    wire [31:0] 	    instr = (state == DECODE ? ram_dout : instr_reg);
    
    // opcodes
@@ -220,19 +219,14 @@ module barrel(
    reg [31:0]       op1, op2;
    reg [31:0]       result;
 
-   reg [31:0]       eaddr;
-
+   reg [1:0]       load_eaddr_lo;
+   
    always @(posedge clk) begin
       if (state == DECODE)
 	instr_reg <= ram_dout;
    end
    
    always @* begin : load_store
-      if (opcode == LOAD)
-	eaddr = op1 + {{20{i_type_imm[11]}}, i_type_imm};
-      else
-	eaddr = op1 + {{20{s_type_imm[11]}}, s_type_imm}; // store
-      
       (* parallel_case *)
       case (1'b1)
 	state == FETCH: begin
@@ -242,14 +236,19 @@ module barrel(
 	   ram_din = 32'bx;
 	end
 	
-	state == EXECUTE && opcode == LOAD: begin
+	state == EXECUTE && opcode == LOAD: begin : execute_load
+	   reg [31:0] eaddr;
+	   eaddr = op1 + {{20{i_type_imm[11]}}, i_type_imm};
 	   ram_addr = eaddr[31:2];
 	   ram_ren = 1;
 	   ram_bwe = 0;
 	   ram_din = 32'bx;
+	   load_eaddr_lo <= eaddr[1:0];
 	end
 	
-	state == EXECUTE && opcode == STORE: begin
+	state == EXECUTE && opcode == STORE: begin : execute_store
+	   reg [31:0] eaddr;
+	   eaddr = op1 + {{20{s_type_imm[11]}}, s_type_imm};
 	   ram_addr = eaddr[31:2];
 	   ram_ren = 0;
 	   
@@ -341,15 +340,6 @@ module barrel(
              state <= DECODE;
            
            DECODE: begin
-	      // $display("DECODE: %08x", instr);
-	      // $display("opcode %07b funct3 %03b", opcode, funct3);
-              if (opcode == CUSTOM0 && funct3 == FUNCT3_EXIT) begin
-		 $display("exit x10 %08x x11 %08x", regs[10], regs[11]);
-		 
-                 exit <= 1;
-		 exitcode <= regs[10];
-	      end
-              
               case (opcode)
                 AUIPC: op <= OP_ADD;
                 OP:
@@ -418,10 +408,20 @@ module barrel(
            end
            
            EXECUTE: begin
-	      $display("op1 %08x op2 %08x", op1, op2);
+	      // $display("op1 %08x op2 %08x", op1, op2);
+	      // $display("DECODE: %08x", instr);
+	      // $display("opcode %07b funct3 %03b", opcode, funct3);
+              if (opcode == CUSTOM0 && funct3 == FUNCT3_EXIT) begin
+		 // $display("exit x10 %08x x11 %08x", regs[10], regs[11]);
+		 
+                 exit <= 1;
+		 exitcode <= rs1;
+	      end
 	      
+	      /*
               if (opcode == CUSTOM0 && funct3 == FUNCT3_DISPLAY)
                 $display("x%0d: %x", rs1, op1);
+	       */
               
               case (op)
                 OP_ADD: result <= op1 + op2;
@@ -475,13 +475,13 @@ module barrel(
            
            WRITEBACK: begin
               if (opcode == LUI) begin
-		 $display("regs[%d] <= %08x", rd, {u_type_imm, 12'b0});
+		 // $display("regs[%d] <= %08x", rd, {u_type_imm, 12'b0});
 		 regs[rd] <= {u_type_imm, 12'b0};
 	      end else if (opcode == AUIPC || opcode == OP || opcode == OP_IMM) begin
-		 $display("regs[%d] <= %08x", rd, result);
+		 // $display("regs[%d] <= %08x", rd, result);
                  regs[rd] <= result;
               end else if (opcode == JAL || opcode == JALR) begin
-		 $display("regs[%d] <= %08x", rd, pc + 4);
+		 // $display("regs[%d] <= %08x", rd, pc + 4);
                  regs[rd] <= pc4;
 	      end else if (opcode == LOAD) begin : writeback_load
                  reg [31:0] v;
@@ -490,21 +490,21 @@ module barrel(
                    FUNCT3_LW: v = ram_dout;
                    
                    FUNCT3_LH: begin
-                     case (eaddr[1])
+                     case (load_eaddr_lo[1])
                        1'b0: v = {{16{ram_dout[15]}}, ram_dout[15:0]};
                        1'b1: v = {{16{ram_dout[31]}}, ram_dout[31:16]};
                      endcase
                    end
 
                    FUNCT3_LHU: begin
-                     case (eaddr[1])
+                     case (load_eaddr_lo[1])
                        1'b0: v = {16'b0, ram_dout[15:0]};
                        1'b1: v = {16'b0, ram_dout[31:16]};
                      endcase
                    end
                    
                    FUNCT3_LB: begin
-                      case (eaddr[1:0])
+                      case (load_eaddr_lo)
                         2'b00: v = {{24{ram_dout[7]}}, ram_dout[7:0]};
                         2'b01: v = {{24{ram_dout[15]}}, ram_dout[15:8]};
                         2'b10: v = {{24{ram_dout[23]}}, ram_dout[23:16]};
@@ -513,7 +513,7 @@ module barrel(
                    end
                    
                    FUNCT3_LBU: begin
-                     case (eaddr[1:0])
+                     case (load_eaddr_lo)
                        2'b00: v = {24'b0, ram_dout[7:0]};
                        2'b01: v = {24'b0, ram_dout[15:8]};
                        2'b10: v = {24'b0, ram_dout[23:16]};
@@ -522,7 +522,7 @@ module barrel(
                    end
                  endcase
                  
-		 $display("regs[%d] <= %08x", rd, v);
+		 // $display("regs[%d] <= %08x", rd, v);
                  regs[rd] <= v;
               end
 	      
