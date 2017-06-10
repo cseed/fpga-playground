@@ -9,6 +9,7 @@ route_design
 
 report_utilization
 report_timing
+report_clocks
 
 write_verilog -force synth_main.v
 write_bitstream -force main.bit

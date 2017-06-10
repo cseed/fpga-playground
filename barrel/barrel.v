@@ -219,6 +219,7 @@ module barrel(
    reg [31:0]       op1, op2;
    reg [31:0]       result;
 
+   reg [31:0] 	    eaddr;
    reg [1:0]       load_eaddr_lo;
    
    always @(posedge clk) begin
@@ -226,10 +227,16 @@ module barrel(
 	instr_reg <= ram_dout;
    end
    
+   always @(posedge clk) begin
+      if (state == EXECUTE && opcode == LOAD)
+	load_eaddr_lo <= eaddr[1:0];
+   end
+   
    always @* begin : load_store
       (* parallel_case *)
       case (1'b1)
 	state == FETCH: begin
+	   eaddr = 32'bx;
 	   ram_addr = pc[31:2];
 	   ram_ren = 1;
 	   ram_bwe = 0;
@@ -237,17 +244,14 @@ module barrel(
 	end
 	
 	state == EXECUTE && opcode == LOAD: begin : execute_load
-	   reg [31:0] eaddr;
 	   eaddr = op1 + {{20{i_type_imm[11]}}, i_type_imm};
 	   ram_addr = eaddr[31:2];
 	   ram_ren = 1;
 	   ram_bwe = 0;
 	   ram_din = 32'bx;
-	   load_eaddr_lo <= eaddr[1:0];
 	end
 	
 	state == EXECUTE && opcode == STORE: begin : execute_store
-	   reg [31:0] eaddr;
 	   eaddr = op1 + {{20{s_type_imm[11]}}, s_type_imm};
 	   ram_addr = eaddr[31:2];
 	   ram_ren = 0;
@@ -284,6 +288,7 @@ module barrel(
 	end
 	
 	default: begin
+	   eaddr = 32'bx;
 	   ram_addr = 32'bx;
 	   ram_ren = 0;
 	   ram_bwe = 0;
