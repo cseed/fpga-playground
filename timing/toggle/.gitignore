@@ -2,6 +2,6 @@
 /main.bit
 *~
 /*_webtalk.*
-/logs/*.log
+/tmp/*
 /vivado*.jou
 /vivado*.log
