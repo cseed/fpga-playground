@@ -12,7 +12,7 @@ module ram32(
              output reg [31:0]      dout,
              input                  ren);
    
-   // 12 = 4K words
+   // 12 = 1K words
    parameter ADDR_WIDTH = 12;
    
 `ifdef IMAGE
@@ -77,11 +77,11 @@ module barrel(
              .ren(ram_ren));
    
    // states
-   localparam FETCH = 8'b00000001;
-   localparam DECODE = 8'b00000010;
-   localparam READ = 8'b00000100;
-   localparam EXECUTE = 8'b00001000;
-   localparam WRITEBACK = 8'b00010000;
+   localparam FETCH = 0;
+   localparam DECODE = 1;
+   localparam READ = 2;
+   localparam EXECUTE = 3;
+   localparam WRITEBACK = 4;
    
    reg [7:0]        state;
    
