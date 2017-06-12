@@ -27,14 +27,12 @@ Timing experiments.
 
 design | xc7a35t-1li (Arty) | ku035-2e
 ------ | ---------------- | --------
-1-bit toggle flip-flop | 1.237ns / 808.4MHz | 0.293ns / 3.413GHz
-32-bit adder | 2.723ns / 367.2MHz | 1.257ns / 795.5MHz
-32Kb RAM* | 3.567ns / 280.3MHz | 2.124ns / 470.8MHz
+1-bit toggle flip-flop | 1.181ns / 846.7MHz | 0.294ns / 3.401GHz
+32-bit adder | 2.744ns / 364.3MHz | 1.257ns / 795.5MHz
+32Kb RAM* | 3.49ns / 286.5MHz | 1.707ns / 585.8MHz
 
-*This is a lower bound.  I was interested in seeing the timing for
-BRAMs.  When I increase the clock constraint, Vivado converts the
-memory into distributed RAM.  In neither case was the BRAM on the
-critical path.  Maximum BRAM timing from datasheet is: xc7a35t-1li:
-388.2MHz, ku035-2e: 585MHz.  TODO: try explicitly instantiating the
-BRAM to see if that stops Vivado from converting it to distributed
-RAM.
+*Vivado may implement either as a Block RAM or distributed RAM.
+
+To find the timing, do binary search on the clock constraint starting
+from 3ns to the nearest 0.1ns.  When the constraint is met, take the
+constraint minus the reported slack as the new upper bound.

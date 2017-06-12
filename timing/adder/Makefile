@@ -1,8 +1,8 @@
 
 .PHONY: all
 all:
-	python ./time.py artix7
-	python ./time.py ku
+	python ../common/time.py artix7
+	python ../common/time.py ku
 
 clean:
 	rm -rf .Xil

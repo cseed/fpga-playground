@@ -3,6 +3,8 @@
 from __future__ import print_function
 import sys
 import subprocess
+import re
+import math
 
 family = sys.argv[1]
 
@@ -20,9 +22,16 @@ lower_bound = 0.0
 
 attempt = 3.0
 
+def round3(x):
+    r = int(x * 1000.0) / 1000.0
+    if (x > r):
+        return r + 0.001
+    else:
+        return r
+        
 # do binary search to find best timing to nearest 0.1ns
 while True:
-    print('try period = {}'.format(attempt))
+    print('try period = {}ns'.format(attempt))
 
     xdc_file = 'tmp/main_{}_{}.xdc'.format(family, attempt)
     synth_file = 'tmp/synth_{}_{}.tcl'.format(family, attempt)
@@ -52,19 +61,30 @@ report_timing
     if rc != 0:
         raise ValueError('vivado returned non-zero exit code: {}'.format(rc))
 
-    rc = subprocess.call(['grep', '-q', 'VIOLATED', log_file])
-    if rc == 0:
-        print('    period = {} VIOLATED'.format(attempt))
-        lower_bound = attempt
+    p = subprocess.Popen('grep ^Slack {}'.format(log_file), shell=True, stdout=subprocess.PIPE)
+    (stdout, stderr) = p.communicate()
+
+    if p.returncode != 0:
+        raise ValueError('Slack line not found in log')
+
+    m = re.match('^Slack \\(MET\\) :\\s*([0-9\\.]+)ns', stdout)
+    if m:
+        slack = float(m.group(1))
+        upper_bound = round3(attempt - slack)
+        print('    period = {}ns = {} - {} MET'.format(upper_bound, attempt, slack))
     else:
-        print('    period = {} MET'.format(attempt))
-        upper_bound = attempt
+        m = re.match('^Slack \\(VIOLATED\\)', stdout)
+        if m:
+            print('    period = {}ns VIOLATED'.format(attempt))
+            lower_bound = attempt
+        else:
+            raise ValueError('Slack line not found in grep output')
 
     if upper_bound and upper_bound - lower_bound < 0.1:
-        print('    period = {} BEST'.format(upper_bound))
+        print('    period = {}ns BEST, freq = {}MHz'.format(upper_bound, 1000.0 / upper_bound))
         break
 
     if upper_bound:
-        attempt = (upper_bound + lower_bound) / 2.0
+        attempt = round3((upper_bound + lower_bound) / 2.0)
     else:
         attempt = attempt * 2.0
