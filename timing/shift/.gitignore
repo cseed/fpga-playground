@@ -1,0 +1,7 @@
+/.Xil
+/main.bit
+*~
+/*_webtalk.*
+/tmp/*
+/vivado*.jou
+/vivado*.log

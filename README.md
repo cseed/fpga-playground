@@ -29,10 +29,13 @@ design | xc7a35t-1li (Arty) | ku035-2e
 ------ | ---------------- | --------
 1-bit toggle flip-flop | 1.181ns / 846.7MHz | 0.294ns / 3.401GHz
 32-bit adder | 2.744ns / 364.3MHz | 1.257ns / 795.5MHz
+32-bit shifter | 2.837ns / 352.5MHz | 1.302ns / 768MHz
 32Kb RAM* | 3.49ns / 286.5MHz | 1.707ns / 585.8MHz
 
 *Vivado may implement either as a Block RAM or distributed RAM.
 
-To find the timing, do binary search on the clock constraint starting
-from 3ns to the nearest 0.1ns.  When the constraint is met, take the
-constraint minus the reported slack as the new upper bound.
+To find the best timing, I do binary search on the clock constraint
+starting from 3ns to the nearest 0.1ns.  When the constraint is met,
+take the constraint minus the reported slack as the new upper bound.
+This idea was gratuitously stolen from Clifford Wolf's
+[picorv32](https://github.com/cliffordwolf/picorv32) Vivado scripts.
