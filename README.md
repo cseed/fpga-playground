@@ -39,7 +39,7 @@ Run `make program` to flash the board.
 rom
 ===
 
-Example of initializing a ROM with to 0-he .text section of a RISC-V
+Example of initializing a ROM with the .text section of a RISC-V
 executable in Verilog.
 
 timing
