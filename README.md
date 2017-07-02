@@ -14,10 +14,30 @@ packet.
 On Linux with Vivado installed, just run `make` to build the bitstream
 and `make program` to flash the board.  Tested with Vivado 2016.4.
 
+arty/ddr3
+=========
+
+A minimal DDR3 example using the AXI interface for the Arty.  IP
+creation (clk_wiz and MIG) is scripted.  A simple state machine
+performs a write and readback.  The LEDs mean:
+
+* LD0: the write finished
+* LD1: the read finished
+* LD2: the value read back matches the value written
+
+To build:
+
+```
+$ make create_ip
+$ make synth
+```
+
+Run `make program` to flash the board.
+
 rom
 ===
 
-Example of initializing a ROM with the .text section of a RISC-V
+Example of initializing a ROM with to 0-he .text section of a RISC-V
 executable in Verilog.
 
 timing
