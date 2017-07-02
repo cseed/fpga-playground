@@ -18,8 +18,10 @@ arty/ddr3
 =========
 
 A minimal DDR3 example using the AXI interface for the Arty.  IP
-creation (clk_wiz and MIG) is scripted.  A simple state machine
-performs a write and readback.  The LEDs mean:
+creation (clk_wiz and MIG) is scripted.  `mig.prj` is slightly
+modified from the Arty [board
+files](https://github.com/Digilent/vivado-boards/tree/master/new/board_files).
+A simple state machine performs a write and readback.  The LEDs mean:
 
 * LD0: the write finished
 * LD1: the read finished
