@@ -1,4 +1,4 @@
-open_project ddr.xpr
+open_project ddr3.xpr
 
 reset_run synth_1
 launch_runs synth_1 -jobs 4

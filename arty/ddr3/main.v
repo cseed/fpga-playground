@@ -185,14 +185,18 @@ module main(
 	   4: begin
 	      if (s_axi_bvalid) begin
 		 s_axi_bready <= 1;
-		 state <= 5;
+
+		 if (s_axi_bresp == 2'b00)
+		   state <= 5;
+		 else
+		   state <= 100;
 	      end
 	   end
 	   
 	   5: begin
 	      s_axi_bready <= 0;
-	      led[0] <= 1; // write finished
 	      
+	      led[0] <= 1; // write finished
 	      state <= 6;
 	   end
 	   
@@ -211,22 +215,28 @@ module main(
 	   8: begin
 	      if (s_axi_rvalid) begin
 		 s_axi_rready <= 1;
-		 state <= 9;
+
+		 if (s_axi_rresp == 2'b00)
+		   state <= 9;
+		 else
+		   state <= 100;
 	      end
 	   end
 
 	   9: begin
 	      s_axi_rready <= 0;
 	      
+	      led[1] <= 1; // read finished
+	      
 	      if (s_axi_rdata == 32'hcafe_beef)
 		led[3] <= 1;
 	      
-	      led[1] <= 1; // read finished
-	      
-	      state <= 10;
+	      state <= 100;
 	   end
 	   
-	   10: begin
+	   100: begin
+	      s_axi_bready <= 0;
+	      s_axi_rready <= 0;
 	   end
 	   
 	 endcase
